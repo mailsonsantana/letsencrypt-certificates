@@ -1,0 +1,119 @@
+---
+  - name: "Criando os diretorios necessarios em /etc/letsencrypt"
+    file:
+      path: "{{ letsencrypt_dir }}/{{ item }}"
+      state: directory
+      owner: root
+      group: root
+      mode: u=rwx,g=x,o=x
+    with_items:
+      - account
+      - certs
+      - csrs
+      - keys
+    become: yes
+
+  - name: "Criando os diretorio de domínios em /certs"
+    file:
+      path: "{{ letsencrypt_dir }}/certs/{{ item }}"
+      state: directory
+      owner: root
+      group: root
+      mode: u=rwx,g=x,o=x
+    with_items:
+      - "{{ domain_name }}"
+    become: yes
+
+  - name: "Criando os diretorio de domínios em /cscs"
+    file:
+      path: "{{ letsencrypt_dir }}/csrs/{{ item }}"
+      state: directory
+      owner: root
+      group: root
+      mode: u=rwx,g=x,o=x
+    with_items:
+      - "{{ domain_name }}"
+    become: yes
+
+  - name: "Criando os diretorio de domínios em /keys"
+    file:
+      path: "{{ letsencrypt_dir }}/keys/{{ item }}"
+      state: directory
+      owner: root
+      group: root
+      mode: u=rwx,g=x,o=x
+    with_items:
+      - "{{ domain_name }}"
+    become: yes    
+  
+  - name: "Solicitação da chave de acesso Letsencrypt"
+    community.crypto.openssl_privatekey:
+      path: "{{ letsencrypt_account_key }}"
+    become: yes
+
+  - name: "Solicitação da chave privada CSR"
+    community.crypto.openssl_privatekey:
+      path: "{{ letsencrypt_keys_dir }}/{{ item }}/{{ item }}.pem"
+    become: yes
+    with_items:
+      - "{{ domain_name }}"
+
+  - name: "Solicitação de assinatura de certificado OpenSSL"
+    community.crypto.openssl_csr:
+      path: "{{ letsencrypt_csrs_dir }}/{{ item }}/{{ item }}.csr"
+      privatekey_path: "{{ letsencrypt_keys_dir }}/{{ item }}/{{ item }}.pem"
+      common_name: "{{ item }}"
+    with_items:
+      - "{{ domain_name }}"
+    become: yes
+
+  - name: "Iniciando o  Let's Encrypt challenges"
+    community.crypto.acme_certificate:
+      acme_directory: "{{ acme_directory }}"
+      acme_version: "{{ acme_version }}"
+      account_key_src: "{{ letsencrypt_account_key }}"
+      account_email: "{{ acme_email }}"
+      terms_agreed: 1
+      challenge: "{{ acme_challenge_type }}"
+      csr: "{{ letsencrypt_csrs_dir }}/{{ item }}/{{ item }}.csr"
+      dest: "{{ letsencrypt_certs_dir }}/{{ item }}/{{ item }}.crt"
+      fullchain_dest: "{{ letsencrypt_certs_dir }}/{{ item }}/fullchain_{{ item }}.crt"
+      remaining_days: 80
+    register: acme_challenge_your_domain
+    with_items:
+      - "{{ domain_name }}"
+
+#  - name: "Resultados do Challenge"
+#    debug:
+#      var: acme_challenge_your_domain
+
+  - name: "Resultados do Challenge"
+    debug:
+      msg: "{{ acme_challenge_your_domain | json_query('results[*].challenge_data.\"' + item + '\".\"dns-01\"') }}"
+    with_items:
+      - "{{ domain_name }}"
+ 
+#  - name: "Adicionando registro TXT ao dominio"
+#    nsupdate:
+#      key_name: "nsupdate"
+#      server: "{{ dns_server_ip }}"
+#      zone: "{{ item }}"
+#      record: "{{ acme_challenge_your_domain | json_query('results[*].challenge_data.\"' + item + '\".\"dns-01\".record') }}"
+#      value: "{{ acme_challenge_your_domain | json_query('results[*].challenge_data.\"' + item + '\".\"dns-01\".resource_value') }}"
+#    with_items:
+#      - "{{ domain_name }}"
+#
+#  - name: "Completando o Let's Encrypt challenges e gerando os certificados"
+#    community.crypto.acme_certificate:
+#      acme_directory: "{{ acme_directory }}"
+#      acme_version: "{{ acme_version }}"
+#      account_key_src: "{{ letsencrypt_account_key }}"
+#      account_email: "{{ acme_email }}"
+#      challenge: "{{ acme_challenge_type }}"
+#      csr: "{{ letsencrypt_csrs_dir }}/{{ item }}/{{ item }}.csr"
+#      dest: "{{ letsencrypt_certs_dir }}/{{ item }}/{{ item }}.crt"
+#      chain_dest: "{{ letsencrypt_certs_dir }}/chain_{{ item }}/{{ item }}.crt"
+#      fullchain_dest: "{{ letsencrypt_certs_dir }}/{{ item }}/fullchain_{{ item }}"
+#      data: "{{ acme_challenge_your_domain }}"
+#    with_items:
+#      - "{{ domain_name }}"
