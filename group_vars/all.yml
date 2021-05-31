@@ -8,4 +8,4 @@ letsencrypt_keys_dir: /etc/letsencrypt/keys
 letsencrypt_csrs_dir: /etc/letsencrypt/csrs
 letsencrypt_certs_dir: /etc/letsencrypt/certs
 letsencrypt_account_key: /etc/letsencrypt/account/account.key
-dns_server_ip:
+dns_server_ip: 192.168.0.120

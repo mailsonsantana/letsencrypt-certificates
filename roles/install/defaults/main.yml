@@ -1,4 +1,3 @@
 ---
-domain_name: 
-  - "gnunet.com.br"
-  - "linuxtec.com.br"
+domain_name: gnunet.com.br
+cname_dns: DNS:*.gnunet.com.br,DNS:gnunet.com.br

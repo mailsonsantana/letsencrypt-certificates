@@ -15,7 +15,7 @@
 
   - name: "Criando os diretorio de domínios em /certs"
     file:
-      path: "{{ letsencrypt_dir }}/certs/{{ item }}"
+      path: "{{ letsencrypt_dir }}/certs/{{ item  | replace('*.','') }}"
       state: directory
       owner: root
       group: root
@@ -24,9 +24,9 @@
       - "{{ domain_name }}"
     become: yes
 
-  - name: "Criando os diretorio de domínios em /cscs"
+  - name: "Criando os diretorio de domínios em /csrs"
     file:
-      path: "{{ letsencrypt_dir }}/csrs/{{ item }}"
+      path: "{{ letsencrypt_dir }}/csrs/{{ item  | replace('*.','') }}"
       state: directory
       owner: root
       group: root
@@ -37,7 +37,7 @@
 
   - name: "Criando os diretorio de domínios em /keys"
     file:
-      path: "{{ letsencrypt_dir }}/keys/{{ item }}"
+      path: "{{ letsencrypt_dir }}/keys/{{ item  | replace('*.','') }}"
       state: directory
       owner: root
       group: root
@@ -53,19 +53,23 @@
 
   - name: "Solicitação da chave privada CSR"
     community.crypto.openssl_privatekey:
-      path: "{{ letsencrypt_keys_dir }}/{{ item }}/{{ item }}.pem"
+      path: "{{ letsencrypt_keys_dir }}/{{ item  | replace('*.','') }}/{{ item  | replace('*.','') }}.pem"
     become: yes
     with_items:
       - "{{ domain_name }}"
 
   - name: "Solicitação de assinatura de certificado OpenSSL"
     community.crypto.openssl_csr:
-      path: "{{ letsencrypt_csrs_dir }}/{{ item }}/{{ item }}.csr"
-      privatekey_path: "{{ letsencrypt_keys_dir }}/{{ item }}/{{ item }}.pem"
-      common_name: "{{ item }}"
+      path: "{{ letsencrypt_csrs_dir }}/{{ item | replace('*.','') }}/{{ item  | replace('*.','') }}.csr"
+      privatekey_path: "{{ letsencrypt_keys_dir }}/{{ item | replace('*.','') }}/{{ item | replace('*.','') }}.pem"
+      subject_alt_name: "{{ cname_dns }}"
     with_items:
       - "{{ domain_name }}"
     become: yes
+
+#  - name: "Resultados do cname"
+#    debug:
+#      msg: "{{ cname_dns }}"
 
   - name: "Iniciando o  Let's Encrypt challenges"
     community.crypto.acme_certificate:
@@ -75,34 +79,38 @@
       account_email: "{{ acme_email }}"
       terms_agreed: 1
       challenge: "{{ acme_challenge_type }}"
-      csr: "{{ letsencrypt_csrs_dir }}/{{ item }}/{{ item }}.csr"
-      dest: "{{ letsencrypt_certs_dir }}/{{ item }}/{{ item }}.crt"
-      fullchain_dest: "{{ letsencrypt_certs_dir }}/{{ item }}/fullchain_{{ item }}.crt"
+      csr: "{{ letsencrypt_csrs_dir }}/{{ item | replace('*.','') }}/{{ item | replace('*.','') }}.csr"
+      dest: "{{ letsencrypt_certs_dir }}/{{ item | replace('*.','') }}/{{ item | replace('*.','') }}.crt"
+      fullchain_dest: "{{ letsencrypt_certs_dir }}/{{ item | replace('*.','') }}/fullchain_{{ item | replace('*.','') }}.crt"
       remaining_days: 80
     register: acme_challenge_your_domain
     with_items:
       - "{{ domain_name }}"
 
-#  - name: "Resultados do Challenge"
-#    debug:
-#      var: acme_challenge_your_domain
-
   - name: "Resultados do Challenge"
     debug:
-      msg: "{{ acme_challenge_your_domain | json_query('results[*].challenge_data.\"' + item + '\".\"dns-01\"') }}"
+      msg: "{{ acme_challenge_your_domain | json_query('results[*].challenge_data.[*][][].\"dns-01\"') }}"
     with_items:
       - "{{ domain_name }}"
  
 #  - name: "Adicionando registro TXT ao dominio"
 #    nsupdate:
-#      key_name: "nsupdate"
+##      key_name: "keyname"
+##      key_secret: "VfyLBJwQ9WfQZh0gsR0eIE+Su80KY/kVJpHmP29oL7C41m6Z/ihAgB5r 6ZHBer3fXkM95SvQimQB/IYEdomaRA=="
+##      key_algorithm: hmac-sha512
 #      server: "{{ dns_server_ip }}"
-#      zone: "{{ item }}"
-#      record: "{{ acme_challenge_your_domain | json_query('results[*].challenge_data.\"' + item + '\".\"dns-01\".record') }}"
-#      value: "{{ acme_challenge_your_domain | json_query('results[*].challenge_data.\"' + item + '\".\"dns-01\".resource_value') }}"
+#      zone: "{{ domain_name }}"
+#      record: "_acme_challenge"
+#      value: "{{ item.registro }}"
+#      type: "TXT"
+#      state: present
 #    with_items:
-#      - "{{ domain_name }}"
-#
+#      - name: registro
+#        registro:
+#        - "{{ acme_challenge_your_domain | json_query('results[*].challenge_data.[*][][].\"dns-01\".resource_value | [0]') }}"
+#        - "{{ acme_challenge_your_domain | json_query('results[*].challenge_data.[*][][].\"dns-01\".resource_value | [1]') }}"
+#    become: yes
+
 #  - name: "Completando o Let's Encrypt challenges e gerando os certificados"
 #    community.crypto.acme_certificate:
 #      acme_directory: "{{ acme_directory }}"
